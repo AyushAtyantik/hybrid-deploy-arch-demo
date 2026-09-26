@@ -12,7 +12,7 @@ set -euxo pipefail
 exec > >(tee /var/log/user-data.log) 2>&1
 
 dnf install -y git
-dnf install -y nodejs20 || dnf install -y nodejs
+dnf install -y nodejs22 || dnf install -y nodejs20 || dnf install -y nodejs
 npm i -g pnpm@9
 
 REPO="https://github.com/<YOUR_GITHUB_USER>/hybrid-deploy-arch-demo"

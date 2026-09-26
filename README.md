@@ -61,7 +61,7 @@ pnpm dev
 - **Client view** — http://localhost:5173
 - **Display view** — http://localhost:5173/wall
 
-Requires Node 20+, pnpm 9+, and Docker (for MySQL only).
+Requires Node 22+, pnpm 9+, and Docker (for MySQL only).
 
 > Run `pnpm install` once and commit `pnpm-lock.yaml`. CI and the EC2 bootstrap both use
 > `--frozen-lockfile` and will fail without it.

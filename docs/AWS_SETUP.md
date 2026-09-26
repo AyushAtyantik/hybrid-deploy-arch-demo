@@ -132,6 +132,20 @@ GitHub username and repo name:
 
 > ⚠️ **The `sub` condition is the line that matters.** Without it, *any* GitHub repository
 > in the world can assume this role.
+>
+> **It is also case-sensitive.** IAM compares the string literally, and GitHub emits the
+> owner and repo with their original casing. `repo:ayushatyantik/...` will **not** match a
+> repository owned by `AyushAtyantik`. Copy the owner/repo exactly as they appear in your
+> GitHub URL.
+>
+> The claim for a run on `main` — whether triggered by a push or by **Run workflow** — is:
+>
+> ```
+> repo:<OWNER>/<REPO>:ref:refs/heads/main
+> ```
+>
+> A run on any other branch, a tag, or a pull request emits a **different** `sub` and will
+> be refused by this policy. That is intended.
 
 Attach an inline policy:
 
@@ -667,7 +681,8 @@ metrics cover everything needed.
 | Instances can reach the internet but not the database | The database was created in `Default VPC` — the VPC can't be changed after creation, so delete and recreate it |
 | `Connect` button greyed out in EC2 console | Instance profile missing from the launch template — instances already running need replacing |
 | Deploy is green but nothing changed | ASG name ≠ `ASG_NAME`, or no instance profile. SSM matched zero targets and still succeeded |
-| `deploy-api` fails at `configure-aws-credentials` | OIDC `sub` condition doesn't match your repo or branch |
+| `deploy-api` fails at `configure-aws-credentials` with `Not authorized to perform sts:AssumeRoleWithWebIdentity` | The role exists but its trust policy refused the token. In order of likelihood: (1) the `sub` condition's owner/repo casing doesn't match, (2) it names the wrong owner or repo, (3) the run is on a branch other than `main`, (4) the OIDC provider was never created, (5) `AWS_DEPLOY_ROLE_ARN` points at a role that doesn't exist |
+| Same, and you want to see the actual claim | CloudTrail → Event history → filter `AssumeRoleWithWebIdentity`. The failed event records the `sub` GitHub sent; compare it character by character with the trust policy |
 | Worker returns `502 origin unreachable` | `ALB_HOST` wrong, has a scheme or trailing slash, or `alb-sg` isn't open on 80 |
 | Everything slows down after a few minutes of load | `t3` credits exhausted — credit specification must be `unlimited` |
 | Instances cycle endlessly under load | Health check timeout too low, or ASG health check type set to `ELB` |

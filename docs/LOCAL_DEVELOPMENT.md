@@ -6,7 +6,7 @@ load-balancer and failover behaviour can be exercised without an AWS account.
 
 ## Prerequisites
 
-- Node 20+
+- Node 22+ (Wrangler requires it)
 - pnpm 9+ (`corepack enable pnpm`)
 - Docker (MySQL only)
 

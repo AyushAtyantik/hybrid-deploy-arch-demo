@@ -4,7 +4,7 @@
   "license": "MIT",
   "type": "module",
   "packageManager": "pnpm@9.15.0",
-  "engines": { "node": ">=20" },
+  "engines": { "node": ">=22" },
   "scripts": {
     "db:up": "docker compose up -d --wait",
     "db:down": "docker compose down -v",
