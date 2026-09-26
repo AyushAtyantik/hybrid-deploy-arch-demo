@@ -1,0 +1,19 @@
+name = "campuswall"
+main = "src/worker.ts"
+compatibility_date = "2024-12-01"
+
+[assets]
+directory = "./dist/client"
+binding = "ASSETS"
+
+# ---------------------------------------------------------------------------
+# Everything environment-specific lives here, so changing it is a COMMIT.
+# Edit this file, push to main, and Actions ships it in ~40s. There is never
+# a reason to run wrangler from a laptop.
+# ---------------------------------------------------------------------------
+[vars]
+# Set this once, after the ALB exists.
+ALB_HOST = "REPLACE_ME.ap-south-1.elb.amazonaws.com"
+
+# Reveals the load-generator button in the UI. See docs/ARCHITECTURE.md.
+SHOW_STRESS = "false"

@@ -1,0 +1,121 @@
+name: deploy
+
+on:
+  push: { branches: [main] }        # main is the deploy branch — push here, it ships
+  pull_request:                     # CI only, never deploys
+  workflow_dispatch:                # "Run workflow" button — redeploy with no commit
+    inputs:
+      force:
+        description: Deploy both halves regardless of what changed
+        type: boolean
+        default: true
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  id-token: write      # required for AWS OIDC
+  contents: read
+
+jobs:
+  # ---- which half of the monorepo actually changed? ------------------------
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      web: ${{ steps.filter.outputs.web }}
+      api: ${{ steps.filter.outputs.api }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            shared: &shared
+              - 'packages/shared/**'
+            web:
+              - *shared
+              - 'apps/web/**'
+            api:
+              - *shared
+              - 'apps/api/**'
+
+  # ---- one CI job for the whole repo --------------------------------------
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -r build
+      - run: pnpm -r typecheck     # a bad change to packages/shared fails HERE
+
+  # ---- edge: ~30s, atomic, global -----------------------------------------
+  deploy-web:
+    needs: [changes, ci]
+    if: github.ref == 'refs/heads/main' && (needs.changes.outputs.web == 'true' || inputs.force)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter "@campuswall/web..." build
+      - uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: apps/web
+
+  # ---- origin: fan out across a fleet whose size keeps changing -----------
+  deploy-api:
+    needs: [changes, ci]
+    if: github.ref == 'refs/heads/main' && (needs.changes.outputs.api == 'true' || inputs.force)
+    runs-on: ubuntu-latest
+    env:
+      ASG_NAME: campuswall-asg      # MUST match the ASG you create in the console
+      AWS_REGION: ap-south-1
+    steps:
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}   # OIDC: no stored keys
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Roll the fleet via SSM
+        run: |
+          set -euo pipefail
+
+          # Target by ASG tag, so this always hits the CURRENT set of instances.
+          CMD=$(aws ssm send-command \
+            --document-name AWS-RunShellScript \
+            --comment "deploy ${{ github.sha }}" \
+            --targets "Key=tag:aws:autoscaling:groupName,Values=$ASG_NAME" \
+            --parameters commands='[
+              "set -eux",
+              "cd /opt/app",
+              "git fetch --depth 1 origin main",
+              "git reset --hard origin/main",
+              "pnpm install --frozen-lockfile --filter @campuswall/api...",
+              "pnpm --filter @campuswall/api... build",
+              "systemctl restart campuswall"
+            ]' \
+            --query Command.CommandId --output text)
+
+          echo "SSM command: $CMD"
+
+          for _ in $(seq 1 40); do
+            sleep 5
+            ST=$(aws ssm list-command-invocations --command-id "$CMD" \
+                   --query 'CommandInvocations[].Status' --output text)
+            echo "status: ${ST:-pending}"
+            case "$ST" in
+              *Failed*|*TimedOut*|*Cancelled*) echo "::error::deploy failed"; exit 1 ;;
+            esac
+            if [ -n "$ST" ] && ! echo "$ST" | grep -qE 'Pending|InProgress|Delayed'; then
+              echo "fleet updated"; exit 0
+            fi
+          done
+          echo "::error::timed out waiting for SSM"; exit 1
