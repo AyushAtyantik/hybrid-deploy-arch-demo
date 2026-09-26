@@ -132,15 +132,33 @@ jobs:
 
           echo "SSM command: $CMD"
 
-          for _ in $(seq 1 40); do
+          for i in $(seq 1 40); do
             sleep 5
             ST=$(aws ssm list-command-invocations --command-id "$CMD" \
                    --query 'CommandInvocations[].Status' --output text)
-            echo "status: ${ST:-pending}"
+
+            # An empty invocation list means the tag filter matched nothing.
+            # Fail loudly rather than spinning until the timeout: a deploy that
+            # updates zero instances must never look like a slow success.
+            if [ -z "$ST" ]; then
+              echo "no invocations yet ($i/6)"
+              if [ "$i" -ge 6 ]; then
+                echo "::error::SSM matched 0 instances after 30s - nothing was deployed."
+                echo "Check, in order:"
+                echo "  1. Instances carry the campuswall-ec2-role instance profile"
+                echo "     (attach it to the launch template, then replace the instances)"
+                echo "  2. They appear under Systems Manager > Fleet Manager"
+                echo "  3. ASG_NAME ($ASG_NAME) matches the Auto Scaling group exactly"
+                exit 1
+              fi
+              continue
+            fi
+
+            echo "status: $ST"
             case "$ST" in
               *Failed*|*TimedOut*|*Cancelled*) echo "::error::deploy failed"; exit 1 ;;
             esac
-            if [ -n "$ST" ] && ! echo "$ST" | grep -qE 'Pending|InProgress|Delayed'; then
+            if ! echo "$ST" | grep -qE 'Pending|InProgress|Delayed'; then
               echo "fleet updated"; exit 0
             fi
           done

@@ -124,28 +124,54 @@ GitHub username and repo name:
     "Action": "sts:AssumeRoleWithWebIdentity",
     "Condition": {
       "StringEquals": { "token.actions.githubusercontent.com:aud": "sts.amazonaws.com" },
-      "StringLike":   { "token.actions.githubusercontent.com:sub": "repo:<YOUR_GITHUB_USER>/hybrid-deploy-arch-demo:ref:refs/heads/main" }
+      "StringLike":   { "token.actions.githubusercontent.com:sub": [
+        "repo:<YOUR_GITHUB_USER>/hybrid-deploy-arch-demo:ref:refs/heads/main",
+        "repo:<YOUR_GITHUB_USER>@*/hybrid-deploy-arch-demo@*:ref:refs/heads/main"
+      ] }
     }
   }]
 }
 ```
 
 > ⚠️ **The `sub` condition is the line that matters.** Without it, *any* GitHub repository
-> in the world can assume this role.
->
-> **It is also case-sensitive.** IAM compares the string literally, and GitHub emits the
-> owner and repo with their original casing. `repo:ayushatyantik/...` will **not** match a
-> repository owned by `AyushAtyantik`. Copy the owner/repo exactly as they appear in your
-> GitHub URL.
->
-> The claim for a run on `main` — whether triggered by a push or by **Run workflow** — is:
->
-> ```
-> repo:<OWNER>/<REPO>:ref:refs/heads/main
-> ```
->
-> A run on any other branch, a tag, or a pull request emits a **different** `sub` and will
-> be refused by this policy. That is intended.
+> in the world can assume this role. It is also **case-sensitive** — IAM compares literally,
+> so `repo:myname/...` will not match a repo owned by `MyName`.
+
+### The `sub` claim has two possible formats
+
+This is the single most likely thing to go wrong, and the error message gives you nothing.
+
+GitHub emits **one of two** subject formats, depending on the account:
+
+```
+repo:OWNER/REPO:ref:refs/heads/main                      # name-based (older)
+repo:OWNER@1234567/REPO@89012345:ref:refs/heads/main     # with immutable numeric IDs
+```
+
+The second form pins the claim to numeric owner and repository IDs so it survives renames.
+If your account emits it and your policy expects the first, every assume-role fails with a
+flat `Not authorized to perform sts:AssumeRoleWithWebIdentity` — no hint that the `sub` is
+the problem.
+
+**Do not guess which one you get.** The `${{ github.repository }}` context does *not* tell
+you: it always prints the name-based form. Accept both instead — `StringLike` takes an
+array, and any match wins:
+
+```json
+"StringLike": {
+  "token.actions.githubusercontent.com:sub": [
+    "repo:<OWNER>/<REPO>:ref:refs/heads/main",
+    "repo:<OWNER>@*/<REPO>@*:ref:refs/heads/main"
+  ]
+}
+```
+
+Once you know your real claim you can pin it exactly, which is marginally stronger:
+**CloudTrail → Event history → Event name `AssumeRoleWithWebIdentity`** → open the event →
+`userIdentity.userName` is the literal `sub` GitHub sent. Copy it verbatim.
+
+A run on any other branch, a tag, or a pull request emits a different `sub` and is refused
+by this policy. That is intended.
 
 Attach an inline policy:
 
@@ -196,6 +222,17 @@ internet gateway in one go).
 NAT gateways cost ~$32/month and add several minutes. The app tier lives in the public
 subnets instead — a deliberate trade-off explained in
 [ARCHITECTURE.md](ARCHITECTURE.md#why-the-app-tier-is-in-public-subnets).
+
+> ⚠️ **Now turn on auto-assign public IPv4 for both public subnets.**
+>
+> **VPC → Subnets →** select `…-public1-…` **→ Actions → Edit subnet settings → ✓ Enable
+> auto-assign public IPv4 address.** Repeat for `…-public2-…`.
+>
+> With no NAT gateway, a public IP is the *only* route these instances have to the
+> internet. Without one they still launch and still show as `Running`, but nothing works:
+> user-data can't `git clone`, so the app is never installed, and the SSM Agent can't
+> register, so deployments match zero instances. The instance summary shows
+> `Public IPv4 address: –` and `Managed: false`.
 
 Take a moment on the **resource map** the wizard draws. It shows the subnets, both route
 tables and the internet gateway, and it is the clearest picture AWS gives you for free.
@@ -479,6 +516,11 @@ By now RDS should be **Available**. Open it and copy the **endpoint**.
 | Key pair | **Do not include** (Session Manager instead) |
 | Subnet | **Don't include in template** (the ASG picks) |
 | Security group | `ec2-sg` |
+| Auto-assign public IP | **Enable**, or leave it to the subnet default from step 7 |
+
+If the launch template defines a network interface, its *Auto-assign public IP* setting
+**overrides** the subnet default. Either set it to `Enable` here, or don't define a network
+interface at all and let the subnet decide.
 
 Then expand **Advanced details**:
 
@@ -681,8 +723,10 @@ metrics cover everything needed.
 | Instances can reach the internet but not the database | The database was created in `Default VPC` — the VPC can't be changed after creation, so delete and recreate it |
 | `Connect` button greyed out in EC2 console | Instance profile missing from the launch template — instances already running need replacing |
 | Deploy is green but nothing changed | ASG name ≠ `ASG_NAME`, or no instance profile. SSM matched zero targets and still succeeded |
-| `deploy-api` fails at `configure-aws-credentials` with `Not authorized to perform sts:AssumeRoleWithWebIdentity` | The role exists but its trust policy refused the token. In order of likelihood: (1) the `sub` condition's owner/repo casing doesn't match, (2) it names the wrong owner or repo, (3) the run is on a branch other than `main`, (4) the OIDC provider was never created, (5) `AWS_DEPLOY_ROLE_ARN` points at a role that doesn't exist |
-| Same, and you want to see the actual claim | CloudTrail → Event history → filter `AssumeRoleWithWebIdentity`. The failed event records the `sub` GitHub sent; compare it character by character with the trust policy |
+| `deploy-api` reports **SSM matched 0 instances**, and the instance shows `Managed: false` | The SSM Agent never registered. Check **Public IPv4 address** on the instance — if it is `–`, the instance has no internet route (no NAT by design), so the agent cannot reach the SSM endpoints. Fix auto-assign public IPv4 (step 7) and **replace the instances** |
+| Instances are `Running` but targets never go healthy, and `/var/log/user-data.log` is missing or stops at `git clone` | Same root cause: no public IP, so no internet |
+| `deploy-api` fails at `configure-aws-credentials` with `Not authorized to perform sts:AssumeRoleWithWebIdentity` | The trust policy refused the token. Most often the **`sub` format** — GitHub may send `repo:OWNER@123/REPO@456:...` rather than `repo:OWNER/REPO:...`. Check CloudTrail (below) before anything else. Then: casing, wrong owner/repo, a branch other than `main`, a provider that was never created, or a bad `AWS_DEPLOY_ROLE_ARN` |
+| Same, and you want the actual claim | CloudTrail → Event history → Event name `AssumeRoleWithWebIdentity`. `userIdentity.userName` in the failed event **is** the `sub` GitHub sent. This is the only reliable way to see it — the workflow context cannot tell you |
 | Worker returns `502 origin unreachable` | `ALB_HOST` wrong, has a scheme or trailing slash, or `alb-sg` isn't open on 80 |
 | Everything slows down after a few minutes of load | `t3` credits exhausted — credit specification must be `unlimited` |
 | Instances cycle endlessly under load | Health check timeout too low, or ASG health check type set to `ELB` |

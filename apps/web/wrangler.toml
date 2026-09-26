@@ -5,6 +5,10 @@ compatibility_date = "2024-12-01"
 [assets]
 directory = "./dist/client"
 binding = "ASSETS"
+# The client is a single-page app: /wall has no file on disk, so without this
+# the assets binding 404s and only "/" works. Vite's dev server does this
+# fallback automatically, which is why it only breaks once deployed.
+not_found_handling = "single-page-application"
 
 # ---------------------------------------------------------------------------
 # Everything environment-specific lives here, so changing it is a COMMIT.
