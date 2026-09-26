@@ -93,11 +93,17 @@ jobs:
           echo "repository:   ${{ github.repository }}"
           echo "ref:          ${{ github.ref }}"
           echo "expected sub: repo:${{ github.repository }}:ref:${{ github.ref }}"
-          case "${{ secrets.AWS_DEPLOY_ROLE_ARN }}" in
+          ARN='${{ secrets.AWS_DEPLOY_ROLE_ARN }}'
+          case "$ARN" in
             arn:aws:iam::*:role/*) echo "role arn shape: OK" ;;
             "")                    echo "role arn: EMPTY - secret not set on this repo" ;;
             *)                     echo "role arn shape: WRONG" ;;
           esac
+          # Print the pieces, not the whole value: substrings aren't masked, and
+          # neither an account id nor a role name is a credential.
+          echo "account:   $(printf '%s' "$ARN" | cut -d: -f5)"
+          echo "role name: ${ARN##*/}"
+          echo "length:    ${#ARN}  (expect no trailing whitespace)"
 
       - uses: aws-actions/configure-aws-credentials@v4
         with:
