@@ -64,11 +64,17 @@ jobs:
         with: { node-version: 20, cache: pnpm }
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter "@campuswall/web..." build
-      - uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: apps/web
+
+      # Deploy with the wrangler pinned in pnpm-lock.yaml, already installed by
+      # the step above. cloudflare/wrangler-action would instead shell out to
+      # `npm install wrangler` inside apps/web, and npm does not understand the
+      # `workspace:*` protocol pnpm uses for @campuswall/shared — so it exits 1.
+      - name: Deploy to Cloudflare Workers
+        working-directory: apps/web
+        env:
+          CLOUDFLARE_API_TOKEN:  ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: pnpm exec wrangler deploy
 
   # ---- origin: fan out across a fleet whose size keeps changing -----------
   deploy-api:

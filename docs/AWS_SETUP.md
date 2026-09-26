@@ -219,43 +219,184 @@ Start this now. It takes ~8 minutes, and you will build the load balancer while 
 
 **RDS → Subnet groups → Create DB subnet group.**
 
-- Name: `campuswall-db-subnets`
-- VPC: `campuswall-vpc`
-- Availability Zones: both
-- Subnets: **the two private subnets only** (`10.0.x.0/24` — check the IDs against the VPC
-  resource map; picking public ones here would let you make the database internet-facing)
+| Field | Value |
+|---|---|
+| Name | `campuswall-db-subnets` |
+| Description | `private subnets for campuswall` |
+| VPC | `campuswall-vpc` |
+| Availability Zones | Both |
+| Subnets | **The two private subnets only** |
+
+Check the subnet IDs against the VPC resource map. The private subnets are the ones whose
+route table has **no** `0.0.0.0/0 → igw` entry. Adding a public subnet here is what later
+lets someone flip the database to internet-facing.
 
 ## Step 10. Create the database
 
-**RDS → Databases → Create database → Standard create.**
+**RDS → Databases → Create database.** The console asks for a lot here; most of it can stay
+at its default. The sections below appear in the order the console shows them, and flag the
+handful that actually matter.
 
-| Setting | Value |
+### Engine options
+
+> ⚠️ **Choose `MySQL`, not `Aurora (MySQL Compatible)`.**
+>
+> Aurora is the **first tile and selected by default**, and it is easy to skip past. Aurora
+> is a different product with different pricing: it has **no `micro` instance class** (the
+> smallest burstable option offered is `db.t4g.medium`, 2 vCPU / 4 GiB), and it bills
+> storage and I/O separately. None of the cost figures in this runbook apply to it.
+>
+> **You are on Aurora if you can see any of these:** *Cluster scalability type*, *Cluster
+> storage configuration*, *DB cluster identifier*, *Create an Aurora Replica or Reader
+> node*, *Read replica write forwarding*, or an engine version reading *"Aurora MySQL 8.4.7
+> (compatible with MySQL 8.4.7)"*. Go back and pick the plain **MySQL** tile.
+
+| Field | Value |
 |---|---|
-| Engine | MySQL **8.4** (matches `docker-compose.yml`) |
-| Template | Free tier (or Dev/Test) |
+| Engine type | **MySQL** |
+
+### Choose a database creation method
+
+**Full configuration.** (This used to be labelled *Standard create*.) The alternative,
+*Easy create*, hides the VPC, subnet group and security group settings — exactly the ones
+this architecture depends on.
+
+### Templates
+
+Pick **Dev/Test**. *Production* pre-selects Multi-AZ, Provisioned IOPS and deletion
+protection, all of which you would then have to undo.
+
+**On the Free tier template:** AWS replaced the 12-month Free Tier on **15 July 2025**.
+Accounts created after that date get a **6-month free plan plus up to $200 in credits**, and
+the *Free tier* template no longer appears — you will see only **Production** and
+**Dev/Test**. That is expected. `db.t4g.micro` is still the right class; just set the values
+explicitly below.
+
+### Availability and durability
+
+**Single DB instance.** The Multi-AZ options double or triple the cost. Multi-AZ is the
+correct production answer and worth knowing about; it is not worth paying for here.
+
+### Settings
+
+| Field | Value |
+|---|---|
+| Engine version | **MySQL 8.4.x** — take the newest minor offered |
+| **Enable RDS Extended Support** | **Leave unchecked** |
 | DB instance identifier | `campuswall-db` |
 | Master username | `admin` |
-| Master password | Generate one and save it — you need it in step 12 |
-| Instance class | `db.t4g.micro` |
-| Storage | 20 GiB gp3, **storage autoscaling off** |
-| Connect to an EC2 compute resource | **Don't connect** |
-| VPC | `campuswall-vpc` |
-| DB subnet group | `campuswall-db-subnets` |
-| **Public access** | **No** |
-| VPC security group | `rds-sg` (remove `default`) |
-| Automated backups | Disable (demo only) |
-| Enhanced monitoring / Performance Insights | Disable |
 
-Then expand **Additional configuration** and set:
+> ⚠️ **Do not pick MySQL 8.0.** It left RDS standard support on **31 July 2026** and now runs
+> only under **RDS Extended Support**, which is a paid offering. 8.4 is in standard support
+> until 31 July 2029 and matches the `mysql:8.4` image in `docker-compose.yml`.
+>
+> The **Enable RDS Extended Support** checkbox sits directly under *Engine version*. Ticking
+> it consents to charges once your major version passes its end-of-standard-support date.
+> On 8.4 that is years away, but leave it off so a forgotten stack fails loudly instead of
+> billing quietly.
+
+### Credentials Settings
+
+> ⚠️ **Change *Credentials management* to "Self managed".**
+>
+> **"Managed in AWS Secrets Manager" is selected by default.** It is the better practice and
+> the console recommends it — but the instance bootstrap reads a plaintext password from
+> user data, so you need one you can copy. Secrets Manager also carries its own charges.
+>
+> Choose **Self managed**, clear **Auto generate a password**, and set a password you
+> control. Save it now: you need it in step 13, and it cannot be retrieved later — only
+> reset by modifying the instance.
+
+Under **Additional credentials settings** you will find **Database authentication**. Leave
+both **IAM database authentication** and **Kerberos authentication** unchecked; password
+authentication is always active and is what the app uses.
+
+### Instance configuration
+
+Select **Burstable classes (includes t classes)**, then **`db.t4g.micro`**.
+
+If the smallest class you are offered is `db.t4g.medium`, you are still on Aurora — go back
+to *Engine options*.
+
+### Storage
+
+| Field | Value |
+|---|---|
+| Storage type | **General Purpose SSD (gp3)** |
+| Allocated storage | **20** GiB |
+| **Storage autoscaling** | **Uncheck "Enable storage autoscaling"** |
+
+Autoscaling is on by default with a **1,000 GiB** maximum. Nothing here will grow, and an
+unbounded ceiling on a throwaway stack is a bad habit.
+
+### Connectivity
+
+| Field | Value |
+|---|---|
+| Compute resource | **Don't connect to an EC2 compute resource** |
+| Network type | **IPv4** |
+| Virtual private cloud (VPC) | **`campuswall-vpc`** — not `Default VPC` |
+| DB subnet group | **`campuswall-db-subnets`** — not `default` |
+| **Public access** | **No** |
+| VPC security group (firewall) | **Choose existing** → `rds-sg`, and remove the `default` chip |
+| Availability Zone | No preference |
+| Certificate authority | Leave the default (`rds-ca-rsa2048-g1`) |
+
+Both the **VPC** and **DB subnet group** fields default to `Default VPC` / `default`. If you
+leave them, the database lands outside the network you built in steps 7–9 and nothing will
+be able to reach it. **You cannot change a database's VPC after creation** — the console
+says so inline.
+
+> ⚠️ **"Connect to an EC2 compute resource" looks helpful and is the wrong choice.** It makes
+> RDS invent its own subnet group and a pair of `rds-ec2-*` security groups, silently
+> bypassing the `alb-sg → ec2-sg → rds-sg` chain from step 8. Instances are launched later by
+> an Auto Scaling group anyway, so there is nothing to attach to yet.
+
+The **Database port** (`3306`) lives under *Connectivity → Additional configuration*.
+
+### Monitoring
+
+| Field | Value |
+|---|---|
+| Database Insights | **Standard** — detailed metrics, free at 7-day retention |
+| Enable collecting detailed per-query metrics | Fine to leave checked |
+| Retention period | **7 days (free)** |
+
+Then expand **Additional monitoring settings**:
+
+> ⚠️ **"Enable Enhanced Monitoring" is checked by default — uncheck it.**
+>
+> It publishes OS metrics to CloudWatch Logs at 60-second granularity and is billed
+> separately. Leaving it on also creates an IAM role called `rds-monitoring-role` that you
+> then have to remember at teardown. You do not need per-process CPU metrics for this.
+
+Leave every **Log exports** checkbox (Audit, Error, General, iam-db-auth-error, instance,
+Slow query) unticked — each one is a billed CloudWatch Logs stream.
+
+### Additional configuration
+
+Expand it. This is where the field that breaks everything lives.
 
 > ⚠️ **Initial database name: `campuswall`**
 >
-> This is the single most commonly missed field in this runbook. The application connects to
-> a database called `campuswall` and creates its *tables* on boot — but it does not create
-> the *database*. Leave this blank and every instance will sit at `/health` → `503 degraded`
-> forever, with no obvious cause.
+> The single most commonly missed field in this runbook. The application connects to a
+> database called `campuswall` and creates its **tables** on boot — but it does not create
+> the **database**. Leave this blank and RDS creates no database at all: every instance sits
+> at `/health` → `503 degraded` indefinitely, with nothing in the logs pointing at the cause.
 
-Create, and move straight on to the next step while it provisions.
+| Field | Value |
+|---|---|
+| Initial database name | **`campuswall`** |
+| DB parameter group | `default.mysql8.4` |
+| Option group | Default |
+| Automated backups | **Uncheck "Enable automated backups"** — nothing here is worth keeping |
+| Encryption | Leave **enabled** (default `aws/rds` key, no extra cost) |
+| Auto minor version upgrade | Leave enabled |
+| Maintenance window | No preference |
+| **Deletion protection** | **Leave unchecked** — you want teardown to be easy |
+
+Choose **Create database**, then move straight to Part 5 while it provisions (~8 minutes).
+Once it reaches **Available**, open it and copy the **endpoint** — you need it in step 13.
 
 ---
 
@@ -520,6 +661,10 @@ metrics cover everything needed.
 |---|---|
 | Targets stuck `unhealthy` | Session Manager in, then `cat /var/log/user-data.log`, `systemctl status campuswall`, `journalctl -u campuswall -n 50` |
 | `/health` returns `degraded`, `"db": false` | **Initial database name not set** (step 10), or `rds-sg` isn't allowing `ec2-sg`, or `DB_HOST`/`DB_PASS` wrong in user-data |
+| Console shows *Cluster scalability type* or *DB cluster identifier* | You selected **Aurora**, not MySQL. Aurora has no `micro` class and prices differently — start step 10 again |
+| Smallest instance class offered is `db.t4g.medium` | Same cause: you are on Aurora |
+| No password to put in user-data | *Credentials management* was left on **Managed in AWS Secrets Manager**. Modify the instance and set a self-managed password |
+| Instances can reach the internet but not the database | The database was created in `Default VPC` — the VPC can't be changed after creation, so delete and recreate it |
 | `Connect` button greyed out in EC2 console | Instance profile missing from the launch template — instances already running need replacing |
 | Deploy is green but nothing changed | ASG name ≠ `ASG_NAME`, or no instance profile. SSM matched zero targets and still succeeded |
 | `deploy-api` fails at `configure-aws-credentials` | OIDC `sub` condition doesn't match your repo or branch |

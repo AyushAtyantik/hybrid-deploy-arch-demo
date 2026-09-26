@@ -14,7 +14,7 @@ flowchart TB
     ci["ci<br/>pnpm build + typecheck"] --> web
     ci --> api
 
-    web["deploy-web<br/>wrangler-action"] --> cf["Cloudflare Workers<br/>~30s"]
+    web["deploy-web<br/>pnpm exec wrangler deploy"] --> cf["Cloudflare Workers<br/>~30s"]
     api["deploy-api<br/>SSM Run Command"] --> ec2["EC2 fleet<br/>~90s"]
 ```
 

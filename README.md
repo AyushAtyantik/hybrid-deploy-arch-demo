@@ -153,7 +153,7 @@ laptop. GitHub Actions runs CI, then deploys only the half that changed
 
 | | Worker | EC2 fleet |
 |---|---|---|
-| Mechanism | `wrangler-action` | SSM Run Command, targeted by ASG tag |
+| Mechanism | `wrangler deploy` | SSM Run Command, targeted by ASG tag |
 | Time | ~30s | ~90s |
 | Auth | Stored API token | **OIDC — no stored credentials** |
 

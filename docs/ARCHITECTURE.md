@@ -114,8 +114,13 @@ and IPs change — which, under an Auto Scaling Group, is constantly.
 RDS in a private subnet demonstrates the network boundary concretely: the same
 `mysql -h <endpoint>` command succeeds from an instance and hangs from anywhere else.
 
-`db.t4g.micro` is free-tier eligible and more than sufficient — the workload is a handful of
-small inserts and one indexed 50-row select.
+`db.t4g.micro` is the smallest sensible class and more than sufficient — the workload is a
+handful of small inserts and one indexed 50-row select. It is covered by whichever free
+allowance your account has, but note that AWS replaced the 12-month Free Tier on **15 July
+2025**: accounts created after that date get a 6-month free plan plus credits instead.
+
+Use **MySQL 8.4**. Version 8.0 left RDS standard support on 31 July 2026 and is now billed
+under RDS Extended Support.
 
 **No S3 bucket is used anywhere.** This is a constraint the repository keeps deliberately, to
 show that a complete, deployable architecture does not require object storage. The main
