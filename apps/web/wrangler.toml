@@ -28,4 +28,4 @@ SHOW_STRESS = "true"
 #   too low  -> CPU never reaches the alarm threshold and nothing scales
 #   too high -> requests queue; harmless, and arguably the point
 # The API clamps whatever arrives to 0-2000ms.
-BURN_MS = "500"
+BURN_MS = "2000"
