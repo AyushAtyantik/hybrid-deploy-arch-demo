@@ -17,7 +17,7 @@ not_found_handling = "single-page-application"
 # ---------------------------------------------------------------------------
 [vars]
 # Set this once, after the ALB exists.
-ALB_HOST = "campuswall-alb-589971767.ap-south-1.elb.amazonaws.com"
+ALB_HOST = "campuswall-lb-995493030.ap-south-1.elb.amazonaws.com"
 
 # Reveals the load-generator button in the UI. See docs/ARCHITECTURE.md.
 SHOW_STRESS = "true"
