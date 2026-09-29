@@ -16,6 +16,15 @@ const clientConfig = {
       res.setHeader('content-type', 'application/json');
       res.end(JSON.stringify({ showStress: process.env.SHOW_STRESS === 'true' }));
     });
+
+    // Mirror the Worker's BURN_MS injection so dev and production behave the
+    // same. Registered before the proxy, so the rewritten URL is what travels.
+    server.middlewares.use((req, _res, next) => {
+      if (req.url?.startsWith('/api/stress') && !req.url.includes('ms=') && process.env.BURN_MS) {
+        req.url += (req.url.includes('?') ? '&' : '?') + `ms=${process.env.BURN_MS}`;
+      }
+      next();
+    });
   },
 };
 

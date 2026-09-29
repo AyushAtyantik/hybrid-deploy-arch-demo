@@ -3,11 +3,10 @@ import { burn } from './burn.ts';
 import { dbHealthy, initSchema, insertPost, listPosts } from './db.ts';
 import { resolveIdentity, stamp } from './identity.ts';
 import { nameFor } from './names.ts';
-import { BadRequest, clampBurnMs, parsePost } from './validate.ts';
+import { BadRequest, clampBurnMs, DEFAULT_BURN_MS, parsePost } from './validate.ts';
 
 const PORT = Number(process.env.PORT ?? 3000);
 const STRESS_ENABLED = process.env.STRESS_ENABLED === 'true';
-const BURN_MS = Number(process.env.BURN_MS ?? 500);
 
 /** Requests served by this process — powers the activity meter. */
 let served = 0;
@@ -70,7 +69,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (path === '/api/config') {
-      return json(res, 200, { stressEnabled: STRESS_ENABLED, burnMs: BURN_MS, ...stamp() });
+      return json(res, 200, { stressEnabled: STRESS_ENABLED, burnMs: DEFAULT_BURN_MS, ...stamp() });
     }
 
     if (path === '/api/posts' && req.method === 'GET') {
@@ -105,7 +104,7 @@ const server = http.createServer(async (req, res) => {
     // is the one that actually does anything.
     if (path === '/api/stress' && req.method === 'POST') {
       if (!STRESS_ENABLED) return json(res, 403, { error: 'stress disabled' });
-      const ms = clampBurnMs(url.searchParams.get('ms') ?? BURN_MS);
+      const ms = clampBurnMs(url.searchParams.get('ms'));
       await burn(ms);
       return json(res, 200, { burned_ms: ms, ...stamp() });
     }

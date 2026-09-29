@@ -2,6 +2,7 @@ interface Env {
   ASSETS: Fetcher;
   ALB_HOST: string;
   SHOW_STRESS: string;
+  BURN_MS: string;
 }
 
 /**
@@ -23,6 +24,13 @@ export default {
     // with a commit, without redeploying or restarting the API.
     if (url.pathname === '/api/client-config') {
       return Response.json({ showStress: env.SHOW_STRESS === 'true' });
+    }
+
+    // How hard /api/stress works is edge config, so it can be retuned with a
+    // commit instead of a new launch template and an instance replacement.
+    // An explicit ?ms= still wins, and the API clamps whatever arrives.
+    if (url.pathname === '/api/stress' && !url.searchParams.has('ms') && env.BURN_MS) {
+      url.searchParams.set('ms', env.BURN_MS);
     }
 
     if (url.pathname.startsWith('/api/')) {

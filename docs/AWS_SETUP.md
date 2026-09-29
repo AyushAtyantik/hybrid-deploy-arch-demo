@@ -255,6 +255,17 @@ flowchart LR
 | 2 | `ec2-sg` | Custom TCP `3000` | **`alb-sg`** |
 | 3 | `rds-sg` | MySQL/Aurora `3306` | **`ec2-sg`** |
 
+> ⚠️ **These are INBOUND rules. All three of them.**
+>
+> Security groups are **stateful** — the reply to an accepted connection is allowed
+> automatically, so the rule only ever goes on the side *receiving* the connection. Adding
+> "MySQL/Aurora 3306 → ec2-sg" to `rds-sg`'s **outbound** tab instead is an easy click to get
+> wrong, and it does nothing: it governs connections the database itself initiates.
+>
+> The symptom is distinctive — `/health` returns `{"db": false}` after **~5 seconds**
+> (`connectTimeout`), because packets are dropped with no reply. Wrong credentials or a
+> missing database fail in *milliseconds* instead.
+
 Leave outbound as the default (all traffic). Add `443` to `alb-sg` only if you later attach
 an ACM certificate; this setup uses plain HTTP because the Worker calls the ALB server-side.
 
@@ -666,8 +677,8 @@ Load:      N requests/sec × B seconds of burn
 | Hold CPU above the 40% threshold | `N × B ≥ 1.6` |
 | Peg CPU at ~100% | `N × B ≥ 4.0` |
 
-At `BURN_MS=500`, about **3.2 requests/second** clears the threshold and **8/second**
-saturates. Overshooting is harmless — CPU pegs and the queue grows, which is the condition
+At `BURN_MS = "500"` (set in `apps/web/wrangler.toml`), about **3.2 requests/second** clears
+the threshold and **8/second** saturates. Overshooting is harmless — CPU pegs and the queue grows, which is the condition
 scaling exists for. Undershooting means the alarm never fires.
 
 Generate it deterministically:
@@ -716,7 +727,8 @@ metrics cover everything needed.
 | Symptom | Cause |
 |---|---|
 | Targets stuck `unhealthy` | Session Manager in, then `cat /var/log/user-data.log`, `systemctl status campuswall`, `journalctl -u campuswall -n 50` |
-| `/health` returns `degraded`, `"db": false` | **Initial database name not set** (step 10), or `rds-sg` isn't allowing `ec2-sg`, or `DB_HOST`/`DB_PASS` wrong in user-data |
+| `/health` returns `degraded`, `"db": false` **after ~5 seconds** | Packets are being dropped — a network problem, not a credentials one. Check `rds-sg` has an **inbound** rule for 3306 from `ec2-sg` (not an *outbound* rule), that RDS is attached to `rds-sg`, and that the instances are in `ec2-sg`. A security group recreated later gets a **new id**, leaving the old rule pointing at a `sg-…` that no longer exists |
+| `/health` returns `degraded`, `"db": false` **immediately** | Credentials or database name — **Initial database name** not set to `campuswall` at step 10, or `DB_HOST`/`DB_PASS` wrong in user-data. Read the exact MySQL error with `journalctl -u campuswall` |
 | Console shows *Cluster scalability type* or *DB cluster identifier* | You selected **Aurora**, not MySQL. Aurora has no `micro` class and prices differently — start step 10 again |
 | Smallest instance class offered is `db.t4g.medium` | Same cause: you are on Aurora |
 | No password to put in user-data | *Credentials management* was left on **Managed in AWS Secrets Manager**. Modify the instance and set a self-managed password |

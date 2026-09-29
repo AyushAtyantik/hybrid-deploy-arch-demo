@@ -219,7 +219,14 @@ while (Date.now() < slice) { hash(); }
 await new Promise((resolve) => setImmediate(resolve));
 ```
 
-CPU still pegs; health checks still answer. This is a real production failure mode, and it
+CPU still pegs; health checks still answer.
+
+How long each press burns is **edge configuration** (`BURN_MS` in `wrangler.toml`), not
+instance configuration. The Worker appends it as `?ms=` when proxying, and the API clamps
+the result to 0–2000ms. Tuning it is a commit and ~40 seconds, rather than a new launch
+template and an instance replacement — the same argument as `SHOW_STRESS`, and a small
+illustration of why config belongs at the edge when the edge is what you can redeploy
+cheaply. This is a real production failure mode, and it
 is the clearest example in the repository of runtime behaviour and infrastructure behaviour
 being the same subject.
 

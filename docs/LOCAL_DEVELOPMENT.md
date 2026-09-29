@@ -153,7 +153,7 @@ resolved once at startup and cached; never per request.
 | `PORT` | `3001`–`3003` | `3000` | both |
 | `INSTANCE_ID` / `AZ` | `i-local-N` / `local-a` | *unset* → IMDSv2 | local only |
 | `STRESS_ENABLED` | `true` | `true` | user-data |
-| `BURN_MS` | `500` | `500` | user-data |
+| `BURN_MS` | `wrangler.toml` / `.dev.vars` | `wrangler.toml` | **edge only** — the API never reads it |
 | `ALB_HOST` (Worker) | `localhost:3000` | ALB DNS name | `.dev.vars` / `wrangler.toml` |
 | `SHOW_STRESS` (Worker) | `true` | commit to change | `.dev.vars` / `wrangler.toml` |
 

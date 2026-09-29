@@ -120,7 +120,7 @@ the pool wraps — `Nebula 2`, `Nebula 3`.
 | `POST` | `/api/posts` | `{ kind, idx, session }` |
 | `POST` | `/api/me` | `{ session }` → claims this browser's display name |
 | `GET` | `/api/whoami` | Stamp only, no DB — for observing round-robin |
-| `GET` | `/api/config` | `{ stressEnabled, burnMs }` |
+| `GET` | `/api/config` | `{ stressEnabled, burnMs }` — `burnMs` is the direct-call default |
 | `POST` | `/api/stress` | Burns CPU. **403 when `STRESS_ENABLED` is off.** |
 
 See which instance answers, twenty times in a row:

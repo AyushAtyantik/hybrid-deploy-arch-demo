@@ -30,9 +30,19 @@ export function parsePost(raw: unknown): CreatePostBody {
   return { kind, idx, session };
 }
 
+/**
+ * How long a press of the stress button burns for.
+ *
+ * The real value is edge configuration — `BURN_MS` in `apps/web/wrangler.toml`,
+ * which the Worker appends as `?ms=`. That keeps it retunable with a commit
+ * rather than a launch template edit. This constant is only the floor for
+ * someone calling the ALB directly with no parameter.
+ */
+export const DEFAULT_BURN_MS = 500;
+const MAX_BURN_MS = 2000;
+
 /** Clamp so a hand-crafted request can't park an instance for a minute. */
 export function clampBurnMs(raw: unknown): number {
-  const fallback = Number(process.env.BURN_MS ?? 500);
   const ms = Number(raw);
-  return Math.min(Math.max(Number.isFinite(ms) ? ms : fallback, 0), 2000);
+  return Math.min(Math.max(Number.isFinite(ms) ? ms : DEFAULT_BURN_MS, 0), MAX_BURN_MS);
 }

@@ -31,7 +31,6 @@ DB_PASS=<RDS_PASSWORD>
 DB_NAME=campuswall
 PORT=3000
 STRESS_ENABLED=true
-BURN_MS=500
 ENV
 chmod 600 /etc/app.env
 
