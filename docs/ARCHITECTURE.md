@@ -15,7 +15,7 @@ flowchart TB
         direction TB
         subgraph PUB["Public · 10.0.1.0/24 az-a · 10.0.2.0/24 az-b"]
             ALB["Application Load Balancer"]
-            ASG["Auto Scaling Group<br/>min 2 · max 6 · t3.micro"]
+            ASG["Auto Scaling Group<br/>min 2 · max 6 · t2.micro"]
         end
         subgraph PRIV["Private · 10.0.3.0/24 az-a · 10.0.4.0/24 az-b"]
             RDS[("RDS MySQL<br/>no public access")]
@@ -221,7 +221,7 @@ await new Promise((resolve) => setImmediate(resolve));
 
 CPU still pegs; health checks still answer.
 
-How long each press burns is **edge configuration** (`BURN_MS` in `wrangler.toml`), not
+How long each press burns is **edge configuration** (`BURN_MS` in `wrangler.jsonc`), not
 instance configuration. The Worker appends it as `?ms=` when proxying, and the API clamps
 the result to 0–2000ms. Tuning it is a commit and ~40 seconds, rather than a new launch
 template and an instance replacement — the same argument as `SHOW_STRESS`, and a small

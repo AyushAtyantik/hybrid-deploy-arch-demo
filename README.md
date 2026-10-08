@@ -165,10 +165,11 @@ laptop. GitHub Actions runs CI, then deploys only the half that changed
 | [`docs/LOCAL_DEVELOPMENT.md`](docs/LOCAL_DEVELOPMENT.md) | Running and testing locally |
 | [`docs/AWS_SETUP.md`](docs/AWS_SETUP.md) | Building the infrastructure, step by step |
 | [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) | CI/CD, OIDC, SSM, rollback |
+| [`docs/IAM_AND_OIDC.md`](docs/IAM_AND_OIDC.md) | Roles, policies, STS and OIDC: how deploys authenticate with no stored AWS keys |
 
 ## Cost
 
-Roughly **$0.06/hour** to run: ALB ~$0.0225/hr, two t3.micro ~$0.0104/hr each, RDS
+Roughly **$0.06/hour** to run: ALB ~$0.0225/hr, two t2.micro ~$0.0124/hr each, RDS
 db.t4g.micro ~$0.016/hr, Cloudflare Workers free tier. No NAT Gateway and no S3 bucket, both
 deliberately avoided.
 

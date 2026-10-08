@@ -15,7 +15,7 @@ dnf install -y git
 dnf install -y nodejs22 || dnf install -y nodejs20 || dnf install -y nodejs
 npm i -g pnpm@9
 
-REPO="https://github.com/<YOUR_GITHUB_USER>/hybrid-deploy-arch-demo"
+REPO="https://github.com/<OWNER>/<REPO>"
 git clone --depth 1 "$REPO" /opt/app
 cd /opt/app
 

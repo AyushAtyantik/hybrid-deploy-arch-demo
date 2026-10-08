@@ -47,13 +47,14 @@ You cannot deploy *to* an Auto Scaling Group — the set of machines changes und
 ## One-time setup
 
 All of it lives in the runbook so there is one authoritative sequence:
-**[AWS_SETUP.md](AWS_SETUP.md) steps 3–6.**
+**[AWS_SETUP.md](AWS_SETUP.md) steps 3–6.** How these fit together is explained in
+[IAM_AND_OIDC.md](IAM_AND_OIDC.md).
 
 | Step | What | Why it matters here |
 |---|---|---|
 | 3 | IAM role `campuswall-ec2-role` on the launch template | Without it SSM matches zero instances and the deploy **reports success while changing nothing** |
 | 4 | GitHub OIDC identity provider | Lets Actions assume a role with no stored AWS keys |
-| 5 | Role `campuswall-gha-deploy`, `sub` scoped to your repo **and branch** | An unscoped `sub` lets *any* GitHub repo assume your role |
+| 5 | Role `campuswall-gha-deploy`, `sub` pinned to your repo's **exact ID-based prefix** and branch | An unscoped `sub` lets *any* GitHub repo assume your role; a wildcard can match a repo that later takes your name |
 | 6 | Secrets: `AWS_DEPLOY_ROLE_ARN`, `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` | |
 
 Cloudflare has no OIDC equivalent for Wrangler, so its token is a stored secret — the one
@@ -67,11 +68,12 @@ name. A mismatch means the deploy targets zero instances **and still passes.**
 Everything environment-specific lives in a tracked file, so there is never a reason to run a
 local command:
 
-```toml
-# apps/web/wrangler.toml
-[vars]
-ALB_HOST    = "campuswall-alb-123456789.ap-south-1.elb.amazonaws.com"
-SHOW_STRESS = "false"
+```jsonc
+// apps/web/wrangler.jsonc
+"vars": {
+  "ALB_HOST": "campuswall-alb-123456789.ap-south-1.elb.amazonaws.com",
+  "SHOW_STRESS": "false"
+}
 ```
 
 Edit, push to `main`, live in ~40 seconds. This can be done entirely from the GitHub web UI.

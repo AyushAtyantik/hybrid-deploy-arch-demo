@@ -92,7 +92,9 @@ jobs:
         run: |
           echo "repository:   ${{ github.repository }}"
           echo "ref:          ${{ github.ref }}"
-          echo "expected sub: repo:${{ github.repository }}:ref:${{ github.ref }}"
+          # github.repository is name-only; the real sub uses the ID-based prefix
+          # shown in Settings -> Actions -> OIDC.
+          echo "sub suffix:   :ref:${{ github.ref }}  (prefix: Settings -> Actions -> OIDC)"
           ARN='${{ secrets.AWS_DEPLOY_ROLE_ARN }}'
           case "$ARN" in
             arn:aws:iam::*:role/*) echo "role arn shape: OK" ;;

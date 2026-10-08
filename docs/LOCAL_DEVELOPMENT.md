@@ -114,7 +114,7 @@ What this **can** verify locally:
 - the badge genuinely alternates between instances
 
 What it **cannot** verify: CPU thresholds. A development machine has far more cores than a
-`t3.micro`, so percentages will not transfer. Tune CloudWatch alarm thresholds against real
+`t2.micro`, so percentages will not transfer. Tune CloudWatch alarm thresholds against real
 instances.
 
 A quick check that the event loop is not blocked — probe the same instance mid-burn:
@@ -153,9 +153,9 @@ resolved once at startup and cached; never per request.
 | `PORT` | `3001`–`3003` | `3000` | both |
 | `INSTANCE_ID` / `AZ` | `i-local-N` / `local-a` | *unset* → IMDSv2 | local only |
 | `STRESS_ENABLED` | `true` | `true` | user-data |
-| `BURN_MS` | `wrangler.toml` / `.dev.vars` | `wrangler.toml` | **edge only** — the API never reads it |
-| `ALB_HOST` (Worker) | `localhost:3000` | ALB DNS name | `.dev.vars` / `wrangler.toml` |
-| `SHOW_STRESS` (Worker) | `true` | commit to change | `.dev.vars` / `wrangler.toml` |
+| `BURN_MS` | `wrangler.jsonc` / `.dev.vars` | `wrangler.jsonc` | **edge only** — the API never reads it |
+| `ALB_HOST` (Worker) | `localhost:3000` | ALB DNS name | `.dev.vars` / `wrangler.jsonc` |
+| `SHOW_STRESS` (Worker) | `true` | commit to change | `.dev.vars` / `wrangler.jsonc` |
 
 ```bash
 cp apps/api/.env.example apps/api/.env

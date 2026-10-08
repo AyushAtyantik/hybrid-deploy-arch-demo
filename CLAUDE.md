@@ -88,7 +88,7 @@ Vite and Wrangler.
 infrastructure from a local machine, and do not suggest it. GitHub Actions runs CI, then
 deploys only the half that changed — `packages/shared/**` counts as both.
 
-Environment-specific values live in `apps/web/wrangler.toml` (`ALB_HOST`, `SHOW_STRESS`), so
+Environment-specific values live in `apps/web/wrangler.jsonc` (`ALB_HOST`, `SHOW_STRESS`), so
 changing configuration is a commit. The EC2 fleet is updated by SSM Run Command targeted at
 the ASG tag, authenticated with GitHub OIDC — there are no stored AWS keys.
 

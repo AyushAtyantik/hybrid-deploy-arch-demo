@@ -33,7 +33,7 @@ export function parsePost(raw: unknown): CreatePostBody {
 /**
  * How long a press of the stress button burns for.
  *
- * The real value is edge configuration — `BURN_MS` in `apps/web/wrangler.toml`,
+ * The real value is edge configuration — `BURN_MS` in `apps/web/wrangler.jsonc`,
  * which the Worker appends as `?ms=`. That keeps it retunable with a commit
  * rather than a launch template edit. This constant is only the floor for
  * someone calling the ALB directly with no parameter.
