@@ -481,7 +481,65 @@ Delete **everything**, in this order. Later items depend on earlier ones being g
 
 14. **Repository secrets**: delete all three from step 6
 
-Then check **AWS Billing → Bills** the next day to confirm nothing is still running.
+### Verify nothing is left
+
+Open **Amazon Q** in the AWS console (the Q icon in the top bar, region **Asia Pacific
+(Mumbai)**) and paste:
+
+```text
+I am tearing down a demo stack in ap-south-1 and want to confirm NOTHING is left running or
+billing. Audit only - do not delete anything. Report findings as a table with columns:
+Resource type | Name/ID | Status (EXISTS / GONE) | Still billing?
+Check every item below by name AND by scanning for orphans. If something exists, give me its
+exact ID and the console path to delete it.
+
+COMPUTE
+1. EC2 instances in any state except "terminated" (tag aws:autoscaling:groupName = campuswall-asg, and any untagged)
+2. Auto Scaling group: campuswall-asg
+3. Launch template: campuswall-lt (and all of its versions)
+4. Any EBS volumes in "available" state (unattached volumes bill)
+5. Any AMIs or EBS snapshots I own
+6. Any Elastic IPs that are allocated but not associated (these bill when idle)
+7. Any orphaned network interfaces (ENIs) in "available" state
+
+LOAD BALANCING
+8. Application Load Balancers: campuswall-alb, campuswall-lb, or any other
+9. Target groups: campuswall-tg or any other
+
+DATABASE
+10. RDS instances: campuswall-db (including "stopped" - stopped instances still bill for storage)
+11. RDS manual snapshots and automated backups (these survive instance deletion)
+12. DB subnet group: campuswall-db-subnets
+13. Any RDS Proxy
+
+NETWORK - these are the expensive ones
+14. NAT gateways in any VPC (~$32/mo each)
+15. VPC interface endpoints, especially com.amazonaws.ap-south-1.ssm / ssmmessages / ec2messages (~$0.01/hr each per AZ)
+16. VPC: campuswall-vpc, its subnets, route tables, internet gateway
+17. Security groups: alb-sg, ec2-sg, rds-sg
+
+MONITORING
+18. CloudWatch alarms: campuswall-cpu-high and any other custom alarms
+19. CloudWatch dashboards: campuswall
+20. CloudWatch log groups (any I created)
+
+IAM - tell me these exist, I will decide separately whether to keep them
+21. Roles: campuswall-ec2-role, campuswall-gha-deploy, rds-monitoring-role
+22. Instance profiles attached to those roles
+23. OIDC identity provider: token.actions.githubusercontent.com
+
+FINALLY
+24. Scan ALL other AWS regions for any EC2 instance, ALB, RDS instance, or NAT gateway I may have created by accident.
+25. Show me the last 3 days of charges broken down by service, and tell me which services are still accruing cost today.
+```
+
+Everything should read **GONE**, apart from the IAM entries if you chose to keep them. If Q
+stops partway, reply "continue".
+
+> ⚠️ Amazon Q reads your account, but it can be wrong or miss something. Treat its table as a
+> checklist, and confirm with **AWS Billing → Bills** the next day: the month-to-date total
+> should stop growing. Cloudflare (steps 12–13) and GitHub (step 14) are outside AWS, so
+> check those by hand.
 
 ## Cost
 
