@@ -424,7 +424,7 @@ button. Set it back to `"false"` when you're done; `/api/stress` is unauthentica
 To generate load without the UI:
 
 ```bash
-npx autocannon -c 8 -d 180 -m POST "http://<alb-dns>/api/stress?ms=500"
+npx autocannon -c 20 -d 180 -m POST "http://<alb-dns>/api/stress?ms=500"
 ```
 
 Scale-out takes 3–5 minutes: the alarm fires, two instances launch, boot and pass health
