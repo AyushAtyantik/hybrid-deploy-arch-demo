@@ -83,7 +83,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       ASG_NAME: campuswall-asg      # MUST match the ASG you create in the console
-      AWS_REGION: ap-south-1
+      AWS_REGION: us-east-1
     steps:
       # TEMPORARY — remove once OIDC is working.
       # Prints the exact `sub` GitHub will send and sanity-checks the role ARN's

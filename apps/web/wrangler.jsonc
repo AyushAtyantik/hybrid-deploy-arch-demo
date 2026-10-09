@@ -20,7 +20,7 @@
   // ---------------------------------------------------------------------------
   "vars": {
     // Set this once, after the ALB exists.
-    "ALB_HOST": "campuswall-alb-1843108683.ap-south-1.elb.amazonaws.com",
+    "ALB_HOST": "campuswall-alb-154626582.us-east-1.elb.amazonaws.com",
 
     // Reveals the load-generator button in the UI. See docs/ARCHITECTURE.md.
     "SHOW_STRESS": "true",
